@@ -1,6 +1,7 @@
 """Arena rendering: background, glowing trails, car sprites, labels."""
 import math
 from collections import deque
+from pathlib import Path
 
 import pygame
 
@@ -59,6 +60,10 @@ class ArenaView:
         self.size = (0, 0)
         self.show_grid = True
         self._bg = None
+        try:
+            self._art = pygame.image.load(str(Path(__file__).parent / "assets" / "arena.png")).convert()
+        except (OSError, pygame.error):
+            self._art = None
         self._surf = None
         self._trail_pts = {}
         self._sprites = {}
@@ -86,9 +91,18 @@ class ArenaView:
     def _build_bg(self) -> pygame.Surface:
         w, h = self.size
         bg = pygame.Surface((w, h))
-        top, bottom = (22, 27, 38), (12, 14, 20)
+        top, bottom = (29, 38, 36), (14, 19, 20)
         for y in range(h):
             pygame.draw.line(bg, mix(top, bottom, y / max(h - 1, 1)), (0, y), (w, y))
+        if self._art is not None:
+            # Cover-crop only when the cached background is rebuilt, never per frame.
+            aw, ah = self._art.get_size()
+            scale = max(w / aw, h / ah)
+            artwork = pygame.transform.smoothscale(self._art, (round(aw * scale), round(ah * scale)))
+            bg.blit(artwork, artwork.get_rect(center=(w // 2, h // 2)))
+            veil = pygame.Surface((w, h), pygame.SRCALPHA)
+            veil.fill((8, 15, 14, 45))
+            bg.blit(veil, (0, 0))
         if self.show_grid:
             grid = pygame.Surface((w, h), pygame.SRCALPHA)
             for x in range(0, w, 50):
@@ -193,7 +207,7 @@ class ArenaView:
         screen.blit(self._corners["tr"], (rect.right - r, rect.y))
         screen.blit(self._corners["bl"], (rect.x, rect.bottom - r))
         screen.blit(self._corners["br"], (rect.right - r, rect.bottom - r))
-        pygame.draw.rect(screen, (46, 53, 72), rect, 1, border_radius=r)
+        pygame.draw.rect(screen, (63, 81, 73), rect, 1, border_radius=r)
 
     def _draw_trails(self, surf, cars, enabled) -> None:
         """Recent rear positions per car, faded toward the background (cheap, no alpha surface)."""
@@ -217,7 +231,7 @@ class ArenaView:
 
     def _empty_state(self, surf) -> None:
         w, h = self.size
-        title = self.fonts.big.render("Waiting for cars…", True, TEXT)
-        sub = self.fonts.body.render("Tilt an ESP32 or a phone, or add demo bots in Settings.", True, MUTED)
+        title = self.fonts.big.render("Your arena. Your rules.", True, TEXT)
+        sub = self.fonts.body.render("B: demo fleet   ·   K: keyboard car", True, MUTED)
         surf.blit(title, title.get_rect(center=(w // 2, h // 2 - 14)))
         surf.blit(sub, sub.get_rect(center=(w // 2, h // 2 + 22)))

@@ -2,50 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>Phone controller</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23171c19%27/%3E%3Cpath d=%27M7 12h18v8H7zM10 9h12v3H10z%27 fill=%27%23b7e583%27/%3E%3C/svg%3E">
+<meta name="theme-color" content="#171c19">
+<title>Carritos MC · Phone controller</title>
 <style>
-  :root { color-scheme: dark; }
+  :root { color-scheme: dark; --accent: #b7e583; --muted: #9ba69e; }
   * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 16px; min-height: 100vh;
-    background: #181a1f; color: #e1e4eb;
-    font: 16px/1.4 system-ui, sans-serif;
-    display: flex; flex-direction: column; gap: 14px; align-items: center;
-  }
-  h1 { font-size: 20px; margin: 4px 0 0; }
-  #status { margin: 0; text-align: center; min-height: 2.8em; color: #9097a8; }
-  .row { display: flex; gap: 10px; width: 100%; max-width: 360px; }
-  button {
-    flex: 1; padding: 14px; border: 0; border-radius: 10px;
-    background: #42a5f5; color: #0b1118; font: 600 16px system-ui, sans-serif;
-  }
-  button:disabled { background: #2a2e38; color: #6b7285; }
-  #zero { background: #ffca28; }
-  .pad {
-    position: relative; width: min(80vw, 320px); aspect-ratio: 1;
-    border: 2px solid #2a2e38; border-radius: 16px;
-    background: linear-gradient(#2a2e38, #2a2e38) center/2px 100% no-repeat,
-                linear-gradient(#2a2e38, #2a2e38) center/100% 2px no-repeat;
-  }
-  #dot {
-    position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px;
-    border-radius: 50%; background: #66bb6a;
-  }
-  .readout { font-variant-numeric: tabular-nums; color: #9097a8; }
-  .hint { max-width: 360px; font-size: 13px; color: #6b7285; text-align: center; margin: 0; }
+  body { margin: 0; padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); min-height: 100dvh; background: #171c19; color: #edf2e8; font: 16px/1.5 system-ui, sans-serif; }
+  main { width: min(100%, 420px); margin: auto; }
+  header { border-bottom: 1px solid #364039; padding-bottom: 20px; margin-bottom: 24px; }
+  .eyebrow { font-size: 11px; letter-spacing: .16em; color: var(--accent); margin: 0 0 6px; }
+  h1 { font-size: clamp(28px, 8vw, 38px); letter-spacing: -.045em; line-height: 1.15; margin: 0 0 12px; }
+  #status { margin: 0; min-height: 3em; color: var(--muted); font-size: 14px; }
+  #status[data-state="connected"] { color: var(--accent); }
+  #status[data-state="error"] { color: #f3b098; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  button { flex: 1; min-height: 48px; padding: 12px; border: 1px solid #455044; border-radius: 8px; background: #29322b; color: #edf2e8; font: 600 14px system-ui; cursor: pointer; transition: background .2s, transform .2s; }
+  #start { background: var(--accent); border-color: var(--accent); color: #1a2516; }
+  button:hover:not(:disabled) { filter: brightness(1.12); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .pad { position: relative; width: 100%; aspect-ratio: 1; margin: 24px 0 16px; border: 1px solid #455044; border-radius: 24px; overflow: hidden; background: linear-gradient(#364039,#364039) center/1px 100% no-repeat, linear-gradient(#364039,#364039) center/100% 1px no-repeat, radial-gradient(circle, #29352b 0, #1d2520 70%); }
+  .pad::before { content: ''; position: absolute; inset: 14%; border: 1px dashed #455044; border-radius: 50%; }
+  .axis { position: absolute; color: var(--muted); font-size: 10px; letter-spacing: .14em; }
+  .forward { top: 14px; left: 50%; transform: translateX(-50%); }
+  .reverse { bottom: 14px; left: 50%; transform: translateX(-50%); }
+  #dot { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px; border: 5px solid #283720; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 8px #b7e58314; }
+  .readout { display: flex; gap: 12px; font-variant-numeric: tabular-nums; }
+  .readout div { flex: 1; padding: 14px 16px; background: #222a24; border-radius: 8px; }
+  .readout span { display: block; color: var(--muted); font-size: 12px; }
+  .readout b { font-size: 26px; font-weight: 500; }
+  .hint { font-size: 13px; color: var(--muted); margin: 22px 0 0; }
+  footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #364039; font-size: 11px; color: var(--muted); letter-spacing: .08em; }
+  @media (prefers-reduced-motion: reduce) { button { transition: none; } }
 </style>
 </head>
 <body>
-  <h1>Phone controller</h1>
-  <p id="status">Tap Start to enable the motion sensor.</p>
-  <div class="row">
-    <button id="start">Start</button>
-    <button id="zero" disabled>Zero</button>
+<main>
+  <header><p class="eyebrow">CARRITOS MC / LIVE CONTROL</p><h1>Your phone.<br>Your steering wheel.</h1><p id="status" role="status" aria-live="polite">Tap Start to enable the motion sensor.</p></header>
+  <div class="row" aria-label="Controller actions">
+    <button id="start">Start</button><button id="zero" disabled>Recalibrate</button><button id="stop" disabled>Stop</button>
   </div>
-  <div class="pad" id="pad"><div id="dot"></div></div>
-  <div class="readout">Roll <b id="roll">0.0</b>° · Pitch <b id="pitch">0.0</b>°</div>
-  <p class="hint">Hold the phone flat like a tray, top edge pointing forward. Tilt forward to accelerate, back to reverse, sideways to steer. Tap Zero to set the current pose as neutral.</p>
+  <div class="pad" id="pad" aria-label="Live steering and throttle visualization"><span class="axis forward">FORWARD</span><span class="axis reverse">REVERSE</span><div id="dot"></div></div>
+  <div class="readout"><div><span>Steering / Roll</span><b id="roll">0.0</b>°</div><div><span>Throttle / Pitch</span><b id="pitch">0.0</b>°</div></div>
+  <p class="hint">Hold your phone flat, top edge forward. Tilt forward to accelerate, back to reverse, sideways to steer. Recalibrate sets your current pose as neutral. Stop releases the controller.</p>
+  <footer>25 HZ TELEMETRY · <span id="identity"></span></footer>
+</main>
 
 <script>
 const MAX_TILT = 30;           // matches FULL_TILT_DEG in core.py (dot reaches the edge)
@@ -59,7 +63,7 @@ function carId() {
   if (fromUrl && /^[A-Za-z0-9_-]{1,24}$/.test(fromUrl)) return fromUrl;
   try {
     let id = localStorage.getItem("carId");
-    if (!id) {
+    if (!id || !/^[A-Za-z0-9_-]{1,24}$/.test(id)) {
       id = "phone-" + Math.random().toString(16).slice(2, 6);
       localStorage.setItem("carId", id);
     }
@@ -70,77 +74,97 @@ function carId() {
 }
 
 const id = carId();
+$("identity").textContent = id;
 let rawRoll = 0, rawPitch = 0, offRoll = 0, offPitch = 0;
 let gotSample = false, zeroOnNext = false, inflight = false, timer = null, failures = 0;
-
+let running = false, starting = false, generation = 0, lastSample = 0, wakeLock = null, request = null;
+function status(message, state = "idle") {
+  // Avoid repeated live-region announcements at 25 Hz.
+  if ($("status").textContent !== message) $("status").textContent = message;
+  $("status").dataset.state = state;
+}
 function onOrientation(e) {
-  if (e.beta == null || e.gamma == null) return;
-  rawRoll = e.gamma;     // + = right side down
-  rawPitch = -e.beta;    // + = top edge down (forward)
-  gotSample = true;
+  if (!running || !Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) return;
+  rawRoll = e.gamma; rawPitch = -e.beta;
+  gotSample = true; lastSample = performance.now();
+  $("zero").disabled = false;
   if (zeroOnNext) { zero(); zeroOnNext = false; }
 }
-
-function zero() { offRoll = rawRoll; offPitch = rawPitch; }
-
+function zero() { offRoll = rawRoll; offPitch = rawPitch; render(0, 0); }
+function render(roll, pitch) {
+  $("roll").textContent = roll.toFixed(1); $("pitch").textContent = pitch.toFixed(1);
+  const reach = Math.max(0, $("pad").clientWidth / 2 - 22);
+  $("dot").style.transform = `translate(${clamp(roll / MAX_TILT, 1) * reach}px, ${clamp(-pitch / MAX_TILT, 1) * reach}px)`;
+}
 async function send() {
-  if (!gotSample) return;
-  const roll = clamp(rawRoll - offRoll, 90);
-  const pitch = clamp(rawPitch - offPitch, 90);
-  $("roll").textContent = roll.toFixed(1);
-  $("pitch").textContent = pitch.toFixed(1);
-  const reach = ($("pad").clientWidth / 2) * 0.88;   // px from center to the pad edge
-  $("dot").style.transform =
-    `translate(${clamp(roll / MAX_TILT, 1) * reach}px, ${clamp(-pitch / MAX_TILT, 1) * reach}px)`;
-
+  if (!running || !gotSample) return;
+  const stale = performance.now() - lastSample > 500;
+  const roll = stale ? 0 : clamp(rawRoll - offRoll, 90);
+  const pitch = stale ? 0 : clamp(rawPitch - offPitch, 90);
+  render(roll, pitch);
   if (inflight) return;
   inflight = true;
+  const session = generation, controller = new AbortController(); request = controller;
+  const timeout = setTimeout(() => controller.abort(), 1500);
   try {
-    const res = await fetch("/tilt", {
-      method: "POST",
+    const res = await fetch("/tilt", { method: "POST", signal: controller.signal,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, roll: +roll.toFixed(1), pitch: +pitch.toFixed(1) }),
-    });
+      body: JSON.stringify({ id, roll: +roll.toFixed(1), pitch: +pitch.toFixed(1) }) });
     if (!res.ok) throw new Error("HTTP " + res.status);
+    if (session !== generation) return;
     failures = 0;
-    $("status").textContent = `Connected as ${id}`;
+    status(stale ? "Sensor paused. Controls are neutral." : `Connected as ${id}`, stale ? "error" : "connected");
   } catch (err) {
-    if (++failures > 5) $("status").textContent = "Lost connection to the PC. Retrying...";
+    if (session === generation && ++failures > 2) status("Connection lost. Retrying; check the PC and WiFi.", "error");
   } finally {
-    inflight = false;
+    clearTimeout(timeout);
+    if (session === generation) { inflight = false; request = null; }
   }
 }
-
+async function acquireWakeLock() {
+  try {
+    const lock = await navigator.wakeLock.request("screen");
+    if (running) wakeLock = lock; else await lock.release();
+  } catch (e) { /* optional */ }
+}
+function stop() {
+  const wasRunning = running;
+  generation++; running = false; starting = false;
+  clearInterval(timer); timer = null;
+  window.removeEventListener("deviceorientation", onOrientation);
+  if (request) request.abort(); request = null; inflight = false;
+  if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null;
+  gotSample = false; render(0, 0);
+  $("start").disabled = false; $("zero").disabled = true; $("stop").disabled = true;
+  status("Controller stopped. Tap Start to reconnect.");
+  if (wasRunning) fetch("/tilt", { method: "POST", keepalive: true,
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, roll: 0, pitch: 0 }) }).catch(() => {});
+}
 $("start").addEventListener("click", async () => {
+  if (starting || running) return;
   const DOE = window.DeviceOrientationEvent;
-  if (!DOE) {
-    $("status").textContent = "This browser has no motion sensor support.";
-    return;
-  }
-  if (typeof DOE.requestPermission === "function") {   // iOS 13+
-    try {
-      if ((await DOE.requestPermission()) !== "granted") {
-        $("status").textContent = "Motion permission denied. Reload the page and allow it.";
-        return;
-      }
-    } catch (e) {
-      $("status").textContent = "Could not ask for motion permission: " + e.message;
-      return;
-    }
-  }
-  window.addEventListener("deviceorientation", onOrientation);
-  zeroOnNext = true;
-  $("start").disabled = true;
-  $("zero").disabled = false;
-  $("status").textContent = "Waiting for sensor data...";
-  timer = setInterval(send, SEND_MS);
-  try { await navigator.wakeLock.request("screen"); } catch (e) { /* optional */ }
-  setTimeout(() => {
-    if (!gotSample) $("status").textContent = "No sensor data. Is this page opened over HTTPS?";
-  }, 2000);
+  if (!DOE) { status("This browser has no motion sensor support.", "error"); return; }
+  if (!window.isSecureContext) { status("Open the bridge HTTPS address to enable motion sensors.", "error"); return; }
+  starting = true; $("start").disabled = true;
+  const session = ++generation;
+  try {
+    if (typeof DOE.requestPermission === "function" && await DOE.requestPermission() !== "granted")
+      throw new Error("Motion permission denied. Allow motion access in browser settings.");
+    if (session !== generation) return;
+    running = true; gotSample = false; failures = 0; zeroOnNext = true;
+    window.addEventListener("deviceorientation", onOrientation);
+    $("stop").disabled = false;
+    status("Waiting for sensor data…");
+    timer = setInterval(send, SEND_MS); acquireWakeLock();
+    setTimeout(() => { if (running && session === generation && !gotSample) status("No sensor data. Check motion access and HTTPS, or tap Stop to retry.", "error"); }, 2000);
+  } catch (err) {
+    if (session === generation) { status(err.message, "error"); $("start").disabled = false; }
+  } finally { if (session === generation) starting = false; }
 });
-
 $("zero").addEventListener("click", zero);
+$("stop").addEventListener("click", stop);
+window.addEventListener("pagehide", stop);
+document.addEventListener("visibilitychange", () => { if (document.hidden && (running || starting)) stop(); });
 </script>
 </body>
 </html>

@@ -221,6 +221,17 @@ firmware/          ESP32 sketch
 tests/
 ```
 
+## Refreshed controls and artwork
+
+The desktop arena uses original model-generated asphalt artwork, packaged locally for offline use. Press **B** to toggle a demo fleet and **K** to toggle the keyboard car; **Tab** toggles the panel. The panel adapts to smaller windows and scrolls the selected car inspector. Driving shortcuts are disabled while editing text.
+
+The phone controller includes **Stop** and **Recalibrate**. Start centers the first sensor reading. Stop or hide the page to release the controller. Missing sensor readings send neutral controls; stalled network requests time out and retry. Sensors still require the HTTPS bridge and device permission.
+
+![Desktop control panel](docs/interface.png)
+![Phone controller](docs/phone-controller.png)
+
+Browser contract tests require Node.js (`node tests/phone_controller.test.cjs`); pytest runs them automatically when Node is installed. CI installs Node so these tests are not skipped.
+
 ## License
 
 [MIT](LICENSE)

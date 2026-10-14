@@ -125,3 +125,81 @@ def test_tab_key_hides_the_panel_and_resizes_the_arena(make):
     app._relayout()
     assert app.sidebar is None and app.arena.w > width_with_panel
     app.frame(1 / 60, [])
+
+def test_shortcuts_start_demo_and_keyboard_without_settings(make):
+    app = make()
+    press(app, pygame.K_b)
+    assert len(app.fleet.snapshot()) == 4
+    press(app, pygame.K_b)
+    assert not app.fleet.snapshot()
+    press(app, pygame.K_k)
+    assert app.kb_enabled
+    assert any(c.source == 'keyboard' for c in app.fleet.snapshot())
+    app.kb_thr = 0.8
+    press(app, pygame.K_k)
+    assert not app.kb_enabled and app.kb_thr == 0
+    assert not any(c.source == 'keyboard' for c in app.fleet.snapshot())
+
+
+def test_escape_and_tab_in_name_field_do_not_trigger_global_shortcuts(make):
+    app = make(bots=1)
+    app.selected = 'demo/bot-1'
+    app.frame(1 / 60, [])
+    inspector_y = app.sidebar.bottom - 12 - app_mod.INSPECTOR_H
+    click(app, (app.sidebar.x + 72, inspector_y + 51))
+    press(app, pygame.K_TAB)
+    assert not app.ui.typing and app.show_sidebar
+    click(app, (app.sidebar.x + 72, inspector_y + 51))
+    press(app, pygame.K_ESCAPE)
+    assert not app.ui.typing and app.selected == 'demo/bot-1'
+
+
+def test_selected_inspector_scrolls_in_narrow_window(make):
+    app = make(bots=4)
+    pygame.display.set_mode((640, 480), pygame.RESIZABLE)
+    app.selected = 'demo/bot-1'
+    app.frame(1 / 60, [])
+    assert app.arena.bottom < app.sidebar.top
+    assert app.sidebar.right <= 640
+    assert app.sidebar.bottom <= 480
+    pygame.mouse.set_pos((app.sidebar.centerx, app.sidebar.bottom - 24))
+    # Dummy driver's mouse cannot move, so use the real event position, then wheel.
+    app.frame(1 / 60, [pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(app.sidebar.centerx, app.sidebar.bottom - 24)), pygame.event.Event(pygame.MOUSEWHEEL, y=-3, x=0)])
+    assert app.scroll['inspector'] > 0
+    assert app.ui._clip is None
+
+
+def test_background_art_is_cached_between_frames(make, monkeypatch):
+    app = make()
+    app.frame(1 / 60, [])
+    assert app.view._art is not None
+    background = app.view._bg
+    monkeypatch.setattr(pygame.transform, 'smoothscale', lambda *args: pytest.fail('unexpected background resize'))
+    app.frame(1 / 60, [])
+    assert app.view._bg is background
+
+
+def test_click_empty_fleet_launches_demo(make):
+    app = make()
+    app.frame(1 / 60, [])
+    click(app, (app.sidebar.centerx, app.sidebar.y + 60 + 170))
+    assert len(app.fleet.snapshot()) == 4
+
+
+def test_text_focus_clears_if_its_widget_disappears(make):
+    app = make(bots=1)
+    app.selected = 'demo/bot-1'
+    app.frame(1 / 60, [])
+    inspector_y = app.sidebar.bottom - 12 - app_mod.INSPECTOR_H
+    click(app, (app.sidebar.x + 72, inspector_y + 51))
+    assert app.ui.typing
+    app.selected = None
+    app.frame(1 / 60, [])
+    assert not app.ui.typing
+
+
+def test_held_shortcut_does_not_toggle_repeatedly(make):
+    app = make()
+    press(app, pygame.K_k)
+    app.frame(1 / 60, [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_k, repeat=True)])
+    assert app.kb_enabled

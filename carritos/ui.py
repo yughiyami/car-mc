@@ -8,15 +8,15 @@ import colorsys
 import pygame
 
 # Theme
-BG = (13, 15, 20)
-PANEL = (20, 23, 31)
-CARD = (27, 31, 42)
-CARD_HOVER = (34, 39, 53)
-BORDER = (42, 48, 64)
-TEXT = (232, 235, 242)
-MUTED = (138, 146, 166)
-DIM = (92, 100, 120)
-ACCENT = (91, 140, 255)
+BG = (15, 19, 20)
+PANEL = (22, 28, 28)
+CARD = (29, 37, 36)
+CARD_HOVER = (38, 49, 46)
+BORDER = (49, 63, 59)
+TEXT = (239, 242, 229)
+MUTED = (160, 177, 169)
+DIM = (123, 142, 134)
+ACCENT = (185, 237, 112)
 OK = (61, 220, 151)
 WARN = (255, 176, 32)
 DANGER = (255, 92, 108)
@@ -60,6 +60,10 @@ class UI:
         self.active = None       # slider being dragged
         self.focus = None        # text input with keyboard focus
         self._clip = None
+        self._clips = []
+        self._focus_rect = None
+        self._focus_seen = False
+        self._input_rects = {}
         self._text_mode = False
         self._cache = {}
 
@@ -74,18 +78,37 @@ class UI:
         self.typed = ""
         self.keys = []
         self._clip = None
+        self._clips = []
+        self._focus_seen = False
+        previous_inputs = self._input_rects
+        self._input_rects = {}
         for e in events:
             if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
                 self.clicked = True
                 self.mouse = e.pos
+                self.down = True
+                if self._focus_rect is not None and not self._focus_rect.collidepoint(e.pos):
+                    self.focus = None
+                for wid, rect in previous_inputs.items():
+                    if rect.collidepoint(e.pos):
+                        self.focus = wid
+                        break
+            elif e.type == pygame.MOUSEBUTTONUP and e.button == 1:
+                self.down = False
+                self.active = None
+            elif e.type == pygame.WINDOWFOCUSLOST:
+                self.active = self.focus = None
+                self.down = False
             elif e.type == pygame.MOUSEWHEEL:
                 self.wheel += e.y
             elif e.type == pygame.TEXTINPUT:
                 self.typed += e.text
-            elif e.type == pygame.KEYDOWN:
+            elif e.type == pygame.KEYDOWN and not getattr(e, "repeat", False):
                 self.keys.append(e.key)
 
     def end(self) -> None:
+        if self.focus is not None and not self._focus_seen:
+            self.focus = None
         if self.focus is not None and not self._text_mode:
             pygame.key.start_text_input()
             self._text_mode = True
@@ -100,12 +123,14 @@ class UI:
     # -- clipping & hit testing --
 
     def push_clip(self, rect) -> None:
-        self._clip = pygame.Rect(rect)
+        self._clips.append(self._clip)
+        rect = pygame.Rect(rect)
+        self._clip = rect.clip(self._clip) if self._clip is not None else rect
         self.surface.set_clip(self._clip)
 
     def pop_clip(self) -> None:
-        self._clip = None
-        self.surface.set_clip(None)
+        self._clip = self._clips.pop() if self._clips else None
+        self.surface.set_clip(self._clip)
 
     def hit(self, rect) -> bool:
         if not pygame.Rect(rect).collidepoint(self.mouse):
@@ -173,17 +198,17 @@ class UI:
             fill, fg = (CARD_HOVER if hover else CARD), TEXT
             border = BORDER
         if active:
-            fill, fg, border = (36, 54, 108), TEXT, ACCENT
+            fill, fg, border = (47, 68, 47), TEXT, ACCENT
         if not enabled:
             fg = DIM
         self.box(rect, fill, 9, border)
-        self.text(label, rect.center, self.fonts.bold, fg, "center")
+        self.text(self.fit(label, self.fonts.bold, rect.w - 12), rect.center, self.fonts.bold, fg, "center")
         return hover and self.clicked
 
     def toggle(self, rect, label, value):
         rect = pygame.Rect(rect)
         hover = self.hit(rect)
-        self.text(label, (rect.x, rect.centery), self.fonts.body, TEXT, "midleft")
+        self.text(self.fit(label, self.fonts.body, rect.w - 52), (rect.x, rect.centery), self.fonts.body, TEXT, "midleft")
         sw = pygame.Rect(0, 0, 40, 22)
         sw.midright = rect.midright
         pygame.draw.rect(self.surface, ACCENT if value else (56, 62, 82), sw, border_radius=11)
@@ -235,6 +260,9 @@ class UI:
     def text_input(self, wid, rect, text, placeholder="", maxlen=20):
         """Returns (text, submitted). Enter submits, Esc drops focus."""
         rect = pygame.Rect(rect)
+        visible = rect.clip(self._clip) if self._clip is not None else rect
+        if visible.w and visible.h:
+            self._input_rects[wid] = visible
         submitted = False
         if self.clicked:
             if self.hit(rect):
@@ -243,6 +271,8 @@ class UI:
                 self.focus = None
         focused = self.focus == wid
         if focused:
+            self._focus_rect = rect.copy()
+            self._focus_seen = True
             text += "".join(ch for ch in self.typed if ch.isprintable())
             for key in self.keys:
                 if key == pygame.K_BACKSPACE:
@@ -250,7 +280,7 @@ class UI:
                 elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                     submitted = True
                     self.focus = None
-                elif key == pygame.K_ESCAPE:
+                elif key in (pygame.K_ESCAPE, pygame.K_TAB):
                     self.focus = None
             text = text[:maxlen]
         self.box(rect, (16, 18, 25), 9, ACCENT if focused else BORDER, 2 if focused else 1)

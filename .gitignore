@@ -12,3 +12,9 @@ dist/
 .certs/
 *.pem
 *.key
+
+# Local CodeGraph intelligence index
+.codegraph/
+
+# Browser validation temporary logs
+.playwright-mcp/

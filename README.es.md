@@ -221,6 +221,17 @@ firmware/          sketch del ESP32
 tests/
 ```
 
+## Diseño y controles renovados
+
+La arena usa una imagen de asfalto generada con el modelo de imágenes, incluida localmente: no necesita red ni claves API. **B** activa o desactiva los bots; **K** activa o desactiva el carrito de teclado; **Tab** muestra u oculta el panel. El panel se adapta a ventanas pequeñas y permite desplazar el inspector. Los atajos de conducción no interfieren mientras escribís en un campo.
+
+El control del celular incluye **Stop** (detener) y **Recalibrate** (recalibrar). Al iniciar, la primera lectura establece la posición neutra. Detener u ocultar la página libera el control. Si faltan lecturas del sensor, envía valores neutros; las solicitudes de red trabadas caducan y se reintentan. El sensor sigue necesitando el puente HTTPS y permiso del dispositivo.
+
+![Panel de escritorio](docs/interface.png)
+![Control del celular](docs/phone-controller.png)
+
+Las pruebas del script del navegador necesitan Node.js (`node tests/phone_controller.test.cjs`); pytest las ejecuta automáticamente si Node está instalado. CI instala Node para no omitirlas.
+
 ## Licencia
 
 [MIT](LICENSE)

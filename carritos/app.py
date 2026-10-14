@@ -30,7 +30,7 @@ class App:
         os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
         pygame.init()
         pygame.display.set_caption("Carritos MC")
-        self.screen = pygame.display.set_mode((args.width, args.height), pygame.RESIZABLE)
+        self.screen = pygame.display.set_mode((max(480, args.width), max(480, args.height)), pygame.RESIZABLE)
         pygame.key.set_repeat(350, 35)
         self.clock = pygame.time.Clock()
         self.fonts = Fonts()
@@ -75,11 +75,20 @@ class App:
     def _relayout(self) -> None:
         self.screen = pygame.display.get_surface()
         w, h = self.screen.get_size()
+        if w < 480 or h < 480:
+            self.screen = pygame.display.set_mode((max(480, w), max(480, h)), pygame.RESIZABLE)
+            w, h = self.screen.get_size()
         self.size = (w, h)
-        sw = SIDEBAR_W if self.show_sidebar else 0
-        gap = MARGIN if sw else 0
-        self.arena = pygame.Rect(MARGIN, TOP, max(200, w - 2 * MARGIN - sw - gap), max(200, h - TOP - MARGIN))
-        self.sidebar = pygame.Rect(w - MARGIN - sw, TOP, sw, h - TOP - MARGIN) if sw else None
+        available_h = max(64, h - TOP - MARGIN)
+        if self.show_sidebar and w < 850:
+            panel_h = min(360, max(260, int(available_h * 0.58)))
+            self.arena = pygame.Rect(MARGIN, TOP, max(64, w - 2 * MARGIN), max(64, available_h - panel_h - 12))
+            self.sidebar = pygame.Rect(MARGIN, self.arena.bottom + 12, self.arena.w, panel_h)
+        else:
+            sw = SIDEBAR_W if self.show_sidebar else 0
+            gap = MARGIN if sw else 0
+            self.arena = pygame.Rect(MARGIN, TOP, max(64, w - 2 * MARGIN - sw - gap), available_h)
+            self.sidebar = pygame.Rect(w - MARGIN - sw, TOP, sw, available_h) if sw else None
         self.fleet.resize(self.arena.w, self.arena.h)
 
     # -- main loop --
@@ -92,14 +101,6 @@ class App:
             for e in events:
                 if e.type == pygame.QUIT:
                     running = False
-                elif e.type == pygame.KEYDOWN and not self.ui.typing:
-                    if e.key == pygame.K_ESCAPE:
-                        running = False
-                    elif e.key == pygame.K_TAB:
-                        self.show_sidebar = not self.show_sidebar
-                        self._relayout()
-                    elif e.key == pygame.K_F11:
-                        pygame.display.toggle_fullscreen()
             self.frame(dt, events)
             pygame.display.flip()
             frames += 1
@@ -118,6 +119,7 @@ class App:
             self._relayout()
         ui = self.ui
         ui.begin(self.screen, events)
+        self._shortcuts()
         self._drive_keyboard_car(dt)
         self.fleet.step(dt)
         cars = sorted(self.fleet.snapshot(), key=lambda c: c.index)
@@ -145,6 +147,37 @@ class App:
             self._draw_sidebar(cars, by_key)
         ui.end()
         self._autosave()
+
+    def _shortcuts(self) -> None:
+        if self.ui.typing:
+            return
+        for key in self.ui.keys:
+            if key == pygame.K_ESCAPE:
+                if self.selected:
+                    self.selected = None
+                else:
+                    pygame.event.post(pygame.event.Event(pygame.QUIT))
+            elif key == pygame.K_TAB:
+                self.show_sidebar = not self.show_sidebar
+                self.ui.focus = self.ui.active = None
+                self._relayout()
+            elif key == pygame.K_F11:
+                pygame.display.toggle_fullscreen()
+            elif key == pygame.K_b:
+                bots = any(c.source == "bot" for c in self.fleet.snapshot())
+                self.fleet.set_bots(0 if bots else 4)
+            elif key == pygame.K_k:
+                self._toggle_keyboard()
+            elif key == pygame.K_SPACE and self.selected:
+                car = next((c for c in self.fleet.snapshot() if c.id == self.selected), None)
+                if car:
+                    self.fleet.set_frozen(car.id, not car.frozen)
+
+    def _toggle_keyboard(self) -> None:
+        self.kb_enabled = not self.kb_enabled
+        self.kb_thr = self.kb_steer = 0.0
+        if not self.kb_enabled:
+            self.fleet.remove(KB_KEY)
 
     def _update_rate(self) -> None:
         now = time.monotonic()
@@ -184,13 +217,19 @@ class App:
     def _draw_topbar(self, cars) -> None:
         ui, f = self.ui, self.fonts
         self.screen.blit(self.logo, (MARGIN + 2, 19))
-        ui.text("Carritos MC", (MARGIN + 60, 11), f.title)
-        ui.text("MQTT tilt arena", (MARGIN + 61, 38), f.small, MUTED)
+        ui.text("CARRITOS / MC", (MARGIN + 60, 11), f.title)
+        ui.text("LIVE CONTROL  /  TILT ARENA", (MARGIN + 61, 38), f.small, MUTED)
 
         state = self.link.state
         color = OK if state == "connected" else (DANGER if state.startswith("refused") else WARN)
         x = self.size[0] - MARGIN
-        rect = ui.pill((x, 32), f"{self.link.host}:{self.link.port}  ·  {state}", f.small, TEXT, CARD, dot=color,
+        if self.size[0] < 850:
+            if ui.button((x - 72, 15, 72, 34), "Panel", active=self.show_sidebar):
+                self.show_sidebar = not self.show_sidebar
+                ui.focus = ui.active = None
+                self._relayout()
+            return
+        rect = ui.pill((x, 32), ui.fit(f"{self.link.host}:{self.link.port}  ·  {state}", f.small, max(120, self.size[0] - 630)), f.small, TEXT, CARD, dot=color,
                        pad=(12, 6), anchor="midright")
         x = rect.left - 8
         rect = ui.pill((x, 32), f"{len(cars)} {'car' if len(cars) == 1 else 'cars'}", f.small, TEXT, CARD,
@@ -242,11 +281,17 @@ class App:
     def _tab_fleet(self, area, cars, by_key) -> None:
         car = by_key.get(self.selected)
         if car:
-            list_area = pygame.Rect(area.x, area.y, area.w, max(0, area.h - INSPECTOR_H - 10))
+            inspector_h = min(INSPECTOR_H, max(100, area.h - 90))
+            list_area = pygame.Rect(area.x, area.y, area.w, max(0, area.h - inspector_h - 10))
             self._scrolled(list_area, "fleet", lambda a: self._car_list(a, cars))
-            self._inspector(pygame.Rect(area.x, area.bottom - INSPECTOR_H, area.w, INSPECTOR_H), car)
+            inspector_area = pygame.Rect(area.x, area.bottom - inspector_h, area.w, inspector_h)
+            self._scrolled(inspector_area, "inspector", lambda a: self._draw_inspector_content(a, car))
         else:
             self._scrolled(area, "fleet", lambda a: self._car_list(a, cars))
+
+    def _draw_inspector_content(self, area, car) -> int:
+        self._inspector(pygame.Rect(area.x, area.y, area.w, INSPECTOR_H), car)
+        return INSPECTOR_H
 
     def _car_list(self, area, cars) -> int:
         ui, f = self.ui, self.fonts
@@ -256,8 +301,11 @@ class App:
             ui.text("Publish tilt to", (cx, area.y + 92), f.small, MUTED, "midtop")
             channel = (self.link.channels or [DEFAULT_CHANNEL])[0]
             ui.pill((cx, area.y + 112), f"{channel}/<id>/tilt", f.small, ACCENT, (28, 36, 62), anchor="midtop")
-            ui.text("or add demo bots in Settings", (cx, area.y + 150), f.small, MUTED, "midtop")
-            return 0
+            if ui.button((area.x + 12, area.y + 154, area.w - 24, 36), "Launch demo fleet  [B]", "primary"):
+                self.fleet.set_bots(4)
+            if ui.button((area.x + 12, area.y + 200, area.w - 24, 36), "Drive with keyboard  [K]"):
+                self._toggle_keyboard()
+            return 250
         for i, car in enumerate(cars):
             self._card(pygame.Rect(area.x, area.y + i * (CARD_H + GAP), area.w, CARD_H), car)
         return len(cars) * (CARD_H + GAP) - GAP
@@ -289,9 +337,9 @@ class App:
 
     def _inspector(self, area, car) -> None:
         ui, f, fleet = self.ui, self.fonts, self.fleet
-        ui.box(area, (24, 28, 39), 14, BORDER)
+        ui.box(area, (26, 34, 32), 14, BORDER)
         x, w, y = area.x + 14, area.w - 28, area.y + 12
-        ui.text("CUSTOMIZE", (x, y + 3), f.tiny, DIM)
+        ui.text("VEHICLE / TELEMETRY", (x, y + 3), f.tiny, DIM)
         if ui.button((area.right - 14 - 26, y - 2, 26, 22), "×", "ghost"):
             self.selected = None
             return
@@ -465,16 +513,15 @@ class App:
         y += 40
         kb = ui.toggle((x, y, w, 32), "Keyboard car  (WASD / arrows)", self.kb_enabled)
         if kb != self.kb_enabled:
-            self.kb_enabled = kb
-            if not kb:
-                fleet.remove(KB_KEY)
+            self._toggle_keyboard()
         y += 40
         if ui.button((x, y, w, 36), "Scatter cars"):
             fleet.scatter()
         y += 56
 
         section("SHORTCUTS")
-        for key, desc in (("Tab", "hide / show this panel"), ("F11", "fullscreen"), ("Esc", "quit"),
+        for key, desc in (("Tab", "hide / show this panel"), ("F11", "fullscreen"), ("Esc", "deselect / quit"),
+                          ("B / K", "demo fleet / keyboard car"), ("Space", "pause selected car"),
                           ("Click", "select a car in the arena")):
             ui.pill((x, y), key, f.tiny, TEXT, CARD, pad=(8, 3))
             ui.text(desc, (x + 64, y + 2), f.small, MUTED)
