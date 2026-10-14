@@ -4,36 +4,36 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Lane-free multi-car arena driven by tilt.** Every ESP32 (or phone) that publishes its tilt over MQTT becomes a car in a desktop arena. Any number of cars, any number of MQTT channels, with a built-in control panel to rename, recolor, pause or kick them.
+**Arena de carritos sin carriles controlados por inclinación.** Cada ESP32 (o celular) que publique su inclinación por MQTT se convierte en un carrito dentro de una arena de escritorio. Sin límite de carritos ni de canales MQTT, y con un panel de control integrado para renombrarlos, cambiarles el color, pausarlos o expulsarlos.
 
-[Leer en español](README.es.md)
+[Read in English](README.en.md)
 
 ![Arena](docs/arena.png)
 
-## Features
+## Características
 
-- **Any number of cars.** A car appears on its first MQTT message and disappears when the device goes offline or stays silent for 3 s.
-- **Live channels.** Listen on as many MQTT topic prefixes as you want and add or remove them at runtime from the panel. The same device id on two channels gives two cars.
-- **Control panel.** Rename cars, pick a color (palette or free hue slider), pause, kick (block) a device, watch live roll/pitch and speed. Names and colors are remembered per device.
-- **Three kinds of controllers:** an ESP32 + MPU6050 (firmware included), a phone (a web page, no app to install) and a built-in simulator. There are also in-app demo bots and a keyboard car, so you can try everything without hardware.
-- **Tunable feel.** Full-tilt angle, dead zone and top speed are sliders.
-- **Light on the CPU.** Roughly 3 ms per frame with 6 cars (measured headless on the dev machine).
+- **Cualquier cantidad de carritos.** Un carrito aparece con su primer mensaje MQTT y desaparece cuando el dispositivo se desconecta o pasa 3 s sin enviar nada.
+- **Canales en vivo.** Escucha todos los prefijos de tópico MQTT que quieras y agrégalos o quítalos mientras corre el programa, desde el panel. El mismo id en dos canales da dos carritos.
+- **Panel de control.** Renombra carritos, elige el color (paleta o slider de matiz libre), páusalos, expulsa (bloquea) un dispositivo y mira en vivo su roll/pitch y velocidad. Nombres y colores se recuerdan por dispositivo.
+- **Tres tipos de control:** un ESP32 + MPU6050 (firmware incluido), un celular (una página web, sin instalar apps) y un simulador integrado. También hay bots de demostración y un carrito de teclado dentro de la app, para probar todo sin hardware.
+- **Sensación ajustable.** Ángulo de inclinación máxima, zona muerta y velocidad máxima son sliders.
+- **Liviano.** Alrededor de 3 ms por frame con 6 carritos (medido sin ventana en la máquina de desarrollo).
 
-## How it works
+## Cómo funciona
 
 ```
  ESP32 + MPU6050 ──┐
                    │  {"roll":..,"pitch":..}        ┌──────────────────┐
- Phone (HTTPS page)─┼──► phone_bridge ──► MQTT ───► │ broker (Mosquitto)│
+ Celular (HTTPS) ───┼──► phone_bridge ──► MQTT ───► │ broker (Mosquitto)│
                    │                                └────────┬─────────┘
- Simulator ────────┘                                         │
+ Simulador ────────┘                                         │
                                                              ▼
-                                              carritos arena (pygame)
+                                              arena carritos (pygame)
 ```
 
-Tilt forward/back = throttle/reverse. Tilt left/right = steer. There are no lanes: cars roam a wrap-around arena and bump into each other.
+Inclinar hacia adelante o atrás = acelerar o retroceder. Inclinar a los costados = girar. No hay carriles: los carritos recorren una arena que se "envuelve" en los bordes y chocan entre sí.
 
-## Quick start (no hardware, no broker)
+## Inicio rápido (sin hardware ni broker)
 
 ```bash
 git clone https://github.com/yughiyami/carritos-mc.git
@@ -44,86 +44,86 @@ pip install -r requirements.txt
 python -m carritos --bots 4
 ```
 
-The window opens with four demo bots. Click a car (or a card in the panel) to customize it. The top bar says `connecting` until a broker is reachable; the bots and the keyboard car work regardless.
+Se abre la ventana con cuatro bots. Haz clic en un carrito (o en una tarjeta del panel) para personalizarlo. La barra superior dice `connecting` hasta que haya un broker accesible; los bots y el carrito de teclado funcionan igual.
 
-## Full setup
+## Instalación completa
 
-### 1. MQTT broker
+### 1. Broker MQTT
 
-Install [Mosquitto](https://mosquitto.org/download/) and run it with the bundled config, which opens port 1883 to your LAN:
+Instala [Mosquitto](https://mosquitto.org/download/) y ejecútalo con la configuración incluida, que abre el puerto 1883 a tu red local:
 
 ```bash
 mosquitto -c mosquitto.conf -v
 ```
 
-With Docker instead:
+Con Docker:
 
 ```bash
 docker run --rm -p 1883:1883 -v "$PWD/mosquitto.conf:/mosquitto/config/mosquitto.conf" eclipse-mosquitto
 ```
 
-> `mosquitto.conf` allows anonymous connections: fine on a trusted home or lab network. On anything else, configure authentication and pass `--user/--password` to every component.
+> `mosquitto.conf` permite conexiones anónimas: sirve para una red casera o de laboratorio de confianza. En cualquier otro caso, configura autenticación y pasa `--user/--password` a cada componente.
 
-Windows: allow the broker (port 1883) through the firewall for private networks so ESP32s can reach it.
+En Windows, permite el broker (puerto 1883) en el firewall para redes privadas, así los ESP32 pueden alcanzarlo.
 
-### 2. The arena
+### 2. La arena
 
 ```bash
-python -m carritos                                  # broker on localhost, channel "carritos"
-python -m carritos --host 192.168.1.50              # broker on another machine
-python -m carritos -c carritos -c garage/carritos   # several channels at once
+python -m carritos                                  # broker en localhost, canal "carritos"
+python -m carritos --host 192.168.1.50              # broker en otra máquina
+python -m carritos -c carritos -c garage/carritos   # varios canales a la vez
 ```
 
-### 3. Controllers
+### 3. Controles
 
-Pick any, or mix them.
+Elige uno o mézclalos.
 
-| Controller | How |
+| Control | Cómo |
 |---|---|
-| **ESP32 + MPU6050** | Flash [`firmware/carrito_esp32`](firmware/carrito_esp32/carrito_esp32.ino), see [ESP32 firmware](#esp32-firmware) |
-| **Phone** | `python -m carritos.phone_bridge`, then open the printed `https://` address on the phone |
-| **Simulator** | `python -m carritos.simulator --cars 5` |
-| **Demo bots / keyboard car** | In the panel: Settings → Demo (no broker needed) |
+| **ESP32 + MPU6050** | Carga [`firmware/carrito_esp32`](firmware/carrito_esp32/carrito_esp32.ino), ver [Firmware del ESP32](#firmware-del-esp32) |
+| **Celular** | `python -m carritos.phone_bridge` y abre en el celular la dirección `https://` que imprime |
+| **Simulador** | `python -m carritos.simulator --cars 5` |
+| **Bots / carrito de teclado** | En el panel: Settings → Demo (sin broker) |
 
-## Using the arena
+## Uso de la arena
 
-The panel on the right has three tabs.
+El panel de la derecha tiene tres pestañas.
 
-**Fleet** lists every car with its speed. Click a card (or the car itself in the arena) to open the inspector:
+**Fleet** lista todos los carritos con su velocidad. Haz clic en una tarjeta (o en el carrito dentro de la arena) para abrir el inspector:
 
-- **Name**: type to rename (up to 20 characters). Saved per device.
-- **Color**: 12 presets or the rainbow slider. Saved per device.
-- **Live tilt pad**: a dot shows the current roll/pitch, the small square is the dead zone.
-- **Pause / Resume** freezes a car in place.
-- **Kick** removes a device and ignores it until you unblock it (Channels tab).
+- **Nombre**: escribe para renombrar (hasta 20 caracteres). Se guarda por dispositivo.
+- **Color**: 12 colores predefinidos o el slider arcoíris. Se guarda por dispositivo.
+- **Pad de inclinación en vivo**: un punto muestra el roll/pitch actual y el cuadrado pequeño es la zona muerta.
+- **Pause / Resume** congela un carrito en su lugar.
+- **Kick** expulsa un dispositivo y lo ignora hasta que lo desbloquees (pestaña Channels).
 
-**Channels** shows the broker connection and message rate, the subscribed channels and how many cars each has. Type a topic prefix (for example `garage/carritos`) and press **Add**; use **×** to stop listening and drop that channel's cars. Kicked devices are listed at the bottom with an **Unblock** button.
+**Channels** muestra la conexión con el broker y la tasa de mensajes, los canales suscritos y cuántos carritos tiene cada uno. Escribe un prefijo de tópico (por ejemplo `garage/carritos`) y presiona **Add**; con **×** dejas de escucharlo y se quitan los carritos de ese canal. Los dispositivos expulsados aparecen al final con un botón **Unblock**.
 
 **Settings**:
 
-| Setting | Effect |
+| Ajuste | Efecto |
 |---|---|
-| Full-tilt angle | Tilt that gives 100 % throttle/steering. Lower = more sensitive |
-| Dead zone | Tilt ignored around neutral |
-| Top speed | Maximum forward speed in px/s |
-| Glowing trails, Name tags, Arena grid | Display toggles |
-| Demo bots | Scripted cars, handy to try the arena |
-| Keyboard car | A car you drive with **WASD** or the arrow keys |
-| Scatter cars | Re-spawn everyone at random spots |
+| Full-tilt angle | Inclinación que da el 100 % de aceleración o giro. Menor = más sensible |
+| Dead zone | Inclinación que se ignora alrededor del neutro |
+| Top speed | Velocidad máxima hacia adelante en px/s |
+| Glowing trails, Name tags, Arena grid | Opciones visuales |
+| Demo bots | Carritos con movimiento programado, útiles para probar |
+| Keyboard car | Un carrito que manejas con **WASD** o las flechas |
+| Scatter cars | Reubica a todos en posiciones al azar |
 
-| Key | Action |
+| Tecla | Acción |
 |---|---|
-| `Tab` | Hide / show the panel |
-| `F11` | Fullscreen |
-| `Esc` | Quit (first drops focus if you are typing) |
+| `Tab` | Ocultar / mostrar el panel |
+| `F11` | Pantalla completa |
+| `Esc` | Salir (si estás escribiendo, primero suelta el foco) |
 
-Settings, channels, and per-device names/colors are saved to `~/.carritos-mc/profile.json`.
+Los ajustes, canales y los nombres/colores por dispositivo se guardan en `~/.carritos-mc/profile.json`.
 
-![Channels tab](docs/channels.png) ![Settings tab](docs/settings.png)
+![Pestaña Channels](docs/channels.png) ![Pestaña Settings](docs/settings.png)
 
-## ESP32 firmware
+## Firmware del ESP32
 
-**Parts:** any ESP32 dev board + an MPU6050 (GY-521) module.
+**Materiales:** cualquier placa ESP32 + un módulo MPU6050 (GY-521).
 
 | MPU6050 | ESP32 |
 |---|---|
@@ -132,106 +132,106 @@ Settings, channels, and per-device names/colors are saved to `~/.carritos-mc/pro
 | SDA | GPIO 21 |
 | SCL | GPIO 22 |
 
-**Flash:**
+**Cargarlo:**
 
-1. In the Arduino IDE install the ESP32 board package and the **PubSubClient** library.
-2. Open `firmware/carrito_esp32/carrito_esp32.ino` and set `WIFI_SSID`, `WIFI_PASS` and `MQTT_HOST` (the IP of the PC running the broker). Optionally set `TOPIC_PREFIX` (the channel) and `CAR_NAME`.
-3. Upload. The serial monitor (115200) prints the car id, e.g. `esp32-3f1c`, and `MQTT connected`.
+1. En el Arduino IDE instala el paquete de placas ESP32 y la librería **PubSubClient**.
+2. Abre `firmware/carrito_esp32/carrito_esp32.ino` y completa `WIFI_SSID`, `WIFI_PASS` y `MQTT_HOST` (la IP de la PC que corre el broker). Opcionalmente `TOPIC_PREFIX` (el canal) y `CAR_NAME`.
+3. Súbelo. El monitor serie (115200) imprime el id del carrito, por ejemplo `esp32-3f1c`, y `MQTT connected`.
 
-**Orientation.** Mount the sensor flat with its printed axes as X forward, Y left, Z up. If a car steers or accelerates the wrong way, flip `SIGN_ROLL` or `SIGN_PITCH` in the sketch. The ESP32 itself has no accelerometer; some boards (M5StickC, T-Watch...) do, but need a small firmware change.
+**Orientación.** Monta el sensor plano con los ejes impresos: X hacia adelante, Y a la izquierda, Z hacia arriba. Si un carrito gira o acelera al revés, invierte `SIGN_ROLL` o `SIGN_PITCH` en el sketch. El ESP32 en sí no trae acelerómetro; algunas placas (M5StickC, T-Watch...) sí, pero requieren un pequeño cambio de firmware.
 
-## Phone controller
+## Celular como control
 
 ```bash
 python -m carritos.phone_bridge --host 192.168.1.50
 ```
 
-1. Open the printed `https://<pc-ip>:8443/` on a phone connected to the same WiFi.
-2. Accept the certificate warning once (the bridge generates a self-signed certificate in `~/.carritos-mc/certs`). HTTPS is mandatory: mobile browsers hide motion sensors on plain HTTP.
-3. Tap **Start** (allow motion access on iOS), hold the phone flat like a tray with the top edge pointing forward, and tap **Zero**.
+1. Abre en un celular conectado a la misma WiFi la dirección `https://<ip-de-la-pc>:8443/` que imprime el programa.
+2. Acepta la advertencia del certificado una sola vez (el puente genera un certificado autofirmado en `~/.carritos-mc/certs`). HTTPS es obligatorio: los navegadores móviles ocultan los sensores de movimiento en HTTP plano.
+3. Toca **Start** (en iOS, permite el acceso al movimiento), sostén el celular plano como una bandeja con el borde superior apuntando hacia adelante y toca **Zero**.
 
-The phone shows up as `phone-xxxx`. Use `--prefix` to publish on another channel and `--https-port` to change the port. Open the firewall for that port if the page does not load.
+El celular aparece como `phone-xxxx`. Usa `--prefix` para publicar en otro canal y `--https-port` para cambiar el puerto. Si la página no carga, abre ese puerto en el firewall.
 
-## MQTT contract
+## Contrato MQTT
 
-Everything is `<channel>/<id>/<kind>`. The default channel is `carritos`.
+Todo sigue el formato `<canal>/<id>/<tipo>`. El canal por defecto es `carritos`.
 
-| Topic | Payload | Notes |
+| Tópico | Payload | Notas |
 |---|---|---|
-| `<channel>/<id>/tilt` | `{"roll": deg, "pitch": deg}` | ~25 Hz. `pitch` + = forward, `roll` + = right |
-| `<channel>/<id>/status` | `online` / `offline` | Retained. Publish `offline` as the MQTT Last Will |
+| `<canal>/<id>/tilt` | `{"roll": grados, "pitch": grados}` | ~25 Hz. `pitch` + = adelante, `roll` + = derecha |
+| `<canal>/<id>/status` | `online` / `offline` | Retenido. Publica `offline` como Last Will de MQTT |
 
-- Channels are letters, numbers, `-` and `_`, optionally nested with `/` (max 48 chars).
-- Any device that follows this contract works, not only the ESP32 firmware here. For example:
+- Los canales usan letras, números, `-` y `_`, y pueden anidarse con `/` (máx. 48 caracteres).
+- Sirve cualquier dispositivo que respete este contrato, no solo el firmware incluido. Por ejemplo:
 
   ```bash
-  mosquitto_pub -h localhost -t carritos/my-device/tilt -m '{"roll": 20, "pitch": 25}'
+  mosquitto_pub -h localhost -t carritos/mi-dispositivo/tilt -m '{"roll": 20, "pitch": 25}'
   ```
 
-## Options
+## Opciones
 
 `python -m carritos`
 
-| Option | Default | Description |
+| Opción | Por defecto | Descripción |
 |---|---|---|
-| `--host`, `--port` | `localhost`, `1883` | MQTT broker |
-| `--user`, `--password` | none | Broker credentials |
-| `-c`, `--channel` | saved profile, else `carritos` | Topic prefix to listen on. Repeatable |
-| `--bots N` | `0` | Start with N demo bots |
-| `--profile PATH` | `~/.carritos-mc/profile.json` | Where names, colors and settings are saved |
-| `--width`, `--height` | `1360`, `820` | Initial window size (resizable) |
+| `--host`, `--port` | `localhost`, `1883` | Broker MQTT |
+| `--user`, `--password` | ninguno | Credenciales del broker |
+| `-c`, `--channel` | perfil guardado, si no `carritos` | Prefijo de tópico a escuchar. Repetible |
+| `--bots N` | `0` | Arrancar con N bots de demostración |
+| `--profile RUTA` | `~/.carritos-mc/profile.json` | Dónde se guardan nombres, colores y ajustes |
+| `--width`, `--height` | `1360`, `820` | Tamaño inicial de la ventana (redimensionable) |
 
 `python -m carritos.phone_bridge`: `--host`, `--port`, `--user`, `--password`, `--prefix`, `--https-port`.
 `python -m carritos.simulator`: `--cars`, `--host`, `--port`, `--user`, `--password`, `--prefix`, `--rate`.
 
-## Troubleshooting
+## Solución de problemas
 
-| Symptom | Check |
+| Síntoma | Qué revisar |
 |---|---|
-| Top bar says `connecting` / `reconnecting` | Broker not running, wrong `--host`, or firewall on port 1883 |
-| The ESP32 prints `MQTT connected` but no car appears | The sketch's `TOPIC_PREFIX` must be one of the channels in the **Channels** tab |
-| A car disappears after a few seconds | The device stopped publishing (3 s timeout); check WiFi and power |
-| A kicked device does not come back | It is blocked: Channels tab → **Unblock** |
-| The phone page opens but shows no data | The URL must be `https://`; tap **Start** and allow motion access |
-| Phone cannot open the page | Same WiFi? Windows firewall allowing Python on private networks? |
-| Steering or throttle feels inverted | Flip `SIGN_ROLL` / `SIGN_PITCH` in the firmware (on the phone page, tap **Zero** to reset the neutral pose) |
-| Too twitchy or too sluggish | Settings → Full-tilt angle and Dead zone |
+| La barra superior dice `connecting` / `reconnecting` | Broker apagado, `--host` incorrecto o firewall en el puerto 1883 |
+| El ESP32 imprime `MQTT connected` pero no aparece el carrito | El `TOPIC_PREFIX` del sketch debe ser uno de los canales de la pestaña **Channels** |
+| Un carrito desaparece a los pocos segundos | El dispositivo dejó de publicar (timeout de 3 s); revisa WiFi y alimentación |
+| Un dispositivo expulsado no vuelve | Está bloqueado: pestaña Channels → **Unblock** |
+| La página del celular abre pero no muestra datos | La URL debe ser `https://`; toca **Start** y permite el acceso al movimiento |
+| El celular no puede abrir la página | ¿Misma WiFi? ¿El firewall de Windows permite Python en redes privadas? |
+| El giro o la aceleración están invertidos | Invierte `SIGN_ROLL` / `SIGN_PITCH` en el firmware (en la página del celular, toca **Zero** para reiniciar la pose neutra) |
+| Muy nervioso o muy lento | Settings → Full-tilt angle y Dead zone |
 
-## Development
+## Desarrollo
 
 ```bash
 pip install -r requirements.txt pytest
 python -m pytest
 ```
 
-The tests run headless (no window, no broker). Layout:
+Los tests corren sin ventana ni broker. Estructura:
 
 ```
 carritos/
-  core.py          pure logic: tilt mapping, physics, fleet, MQTT routing (no pygame/MQTT imports)
-  link.py          MQTT client with live channels
-  app.py           window, layout, control panel
-  render.py        arena drawing
-  ui.py            small immediate-mode widget kit + theme
-  profile.py       saved names, colors, channels, settings
-  phone_bridge.py  HTTPS page -> MQTT
-  simulator.py     fake ESP32s
-  web/             phone controller page
-firmware/          ESP32 sketch
+  core.py          lógica pura: mapeo de inclinación, física, flota, ruteo MQTT (sin pygame/MQTT)
+  link.py          cliente MQTT con canales en vivo
+  app.py           ventana, layout, panel de control
+  render.py        dibujo de la arena
+  ui.py            pequeño kit de widgets + tema
+  profile.py       nombres, colores, canales y ajustes guardados
+  phone_bridge.py  página HTTPS -> MQTT
+  simulator.py     ESP32 simulados
+  web/             página del control por celular
+firmware/          sketch del ESP32
 tests/
 ```
 
-## Refreshed controls and artwork
+## Diseño y controles renovados
 
-The desktop arena uses original model-generated asphalt artwork, packaged locally for offline use. Press **B** to toggle a demo fleet and **K** to toggle the keyboard car; **Tab** toggles the panel. The panel adapts to smaller windows and scrolls the selected car inspector. Driving shortcuts are disabled while editing text.
+La arena usa una imagen de asfalto generada con el modelo de imágenes, incluida localmente: no necesita red ni claves API. **B** activa o desactiva los bots; **K** activa o desactiva el carrito de teclado; **Tab** muestra u oculta el panel. El panel se adapta a ventanas pequeñas y permite desplazar el inspector. Los atajos de conducción no interfieren mientras escribes en un campo.
 
-The phone controller includes **Stop** and **Recalibrate**. Start centers the first sensor reading. Stop or hide the page to release the controller. Missing sensor readings send neutral controls; stalled network requests time out and retry. Sensors still require the HTTPS bridge and device permission.
+El control del celular incluye **Stop** (detener) y **Recalibrate** (recalibrar). Al iniciar, la primera lectura establece la posición neutra. Detener u ocultar la página libera el control. Si faltan lecturas del sensor, envía valores neutros; las solicitudes de red trabadas caducan y se reintentan. El sensor sigue necesitando el puente HTTPS y permiso del dispositivo.
 
-![Desktop control panel](docs/interface.png)
-![Phone controller](docs/phone-controller.png)
+![Panel de escritorio](docs/interface.png)
+![Control del celular](docs/phone-controller.png)
 
-Browser contract tests require Node.js (`node tests/phone_controller.test.cjs`); pytest runs them automatically when Node is installed. CI installs Node so these tests are not skipped.
+Las pruebas del script del navegador necesitan Node.js (`node tests/phone_controller.test.cjs`); pytest las ejecuta automáticamente si Node está instalado. CI instala Node para no omitirlas.
 
-## License
+## Licencia
 
 [MIT](LICENSE)
