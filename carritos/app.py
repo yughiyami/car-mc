@@ -223,21 +223,21 @@ class App:
         state = self.link.state
         color = OK if state == "connected" else (DANGER if state.startswith("refused") else WARN)
         x = self.size[0] - MARGIN
+        if ui.button((x - 112, 15, 112, 34), "Hide panel" if self.show_sidebar else "Show panel",
+                     active=self.show_sidebar):
+            self.show_sidebar = not self.show_sidebar
+            ui.focus = ui.active = None
+            self._relayout()
+        x -= 124
         if self.size[0] < 850:
-            if ui.button((x - 72, 15, 72, 34), "Panel", active=self.show_sidebar):
-                self.show_sidebar = not self.show_sidebar
-                ui.focus = ui.active = None
-                self._relayout()
             return
-        rect = ui.pill((x, 32), ui.fit(f"{self.link.host}:{self.link.port}  ·  {state}", f.small, max(120, self.size[0] - 630)), f.small, TEXT, CARD, dot=color,
+        rect = ui.pill((x, 32), ui.fit(f"{self.link.host}:{self.link.port}  ·  {state}", f.small, max(120, self.size[0] - 754)), f.small, TEXT, CARD, dot=color,
                        pad=(12, 6), anchor="midright")
         x = rect.left - 8
         rect = ui.pill((x, 32), f"{len(cars)} {'car' if len(cars) == 1 else 'cars'}", f.small, TEXT, CARD,
                        pad=(12, 6), anchor="midright")
         x = rect.left - 8
         rect = ui.pill((x, 32), f"{self._rate:.0f} msg/s", f.small, MUTED, CARD, pad=(12, 6), anchor="midright")
-        if not self.sidebar:
-            ui.text("Tab: show panel", (rect.left - 14, 32), f.small, DIM, "midright")
 
     # -- sidebar --
 

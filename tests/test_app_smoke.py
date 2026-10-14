@@ -203,3 +203,20 @@ def test_held_shortcut_does_not_toggle_repeatedly(make):
     press(app, pygame.K_k)
     app.frame(1 / 60, [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_k, repeat=True)])
     assert app.kb_enabled
+
+
+@pytest.mark.parametrize("width", [480, 640, 850, 1360])
+def test_topbar_button_hides_and_restores_panel(make, width):
+    app = make(bots=1)
+    pygame.display.set_mode((width, 600), pygame.RESIZABLE)
+    app.frame(1 / 60, [])
+    original_arena = app.arena.copy()
+    app.selected = "demo/bot-1"
+    button_center = (width - app_mod.MARGIN - 56, 32)
+    click(app, button_center)
+    assert not app.show_sidebar and app.sidebar is None
+    assert app.arena.w * app.arena.h > original_arena.w * original_arena.h
+    assert app.selected == "demo/bot-1"
+    click(app, button_center)
+    assert app.show_sidebar and app.sidebar is not None
+    assert app.arena == original_arena
