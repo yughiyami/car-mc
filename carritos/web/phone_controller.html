@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Phone controller</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; min-height: 100vh;
+    background: #181a1f; color: #e1e4eb;
+    font: 16px/1.4 system-ui, sans-serif;
+    display: flex; flex-direction: column; gap: 14px; align-items: center;
+  }
+  h1 { font-size: 20px; margin: 4px 0 0; }
+  #status { margin: 0; text-align: center; min-height: 2.8em; color: #9097a8; }
+  .row { display: flex; gap: 10px; width: 100%; max-width: 360px; }
+  button {
+    flex: 1; padding: 14px; border: 0; border-radius: 10px;
+    background: #42a5f5; color: #0b1118; font: 600 16px system-ui, sans-serif;
+  }
+  button:disabled { background: #2a2e38; color: #6b7285; }
+  #zero { background: #ffca28; }
+  .pad {
+    position: relative; width: min(80vw, 320px); aspect-ratio: 1;
+    border: 2px solid #2a2e38; border-radius: 16px;
+    background: linear-gradient(#2a2e38, #2a2e38) center/2px 100% no-repeat,
+                linear-gradient(#2a2e38, #2a2e38) center/100% 2px no-repeat;
+  }
+  #dot {
+    position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px;
+    border-radius: 50%; background: #66bb6a;
+  }
+  .readout { font-variant-numeric: tabular-nums; color: #9097a8; }
+  .hint { max-width: 360px; font-size: 13px; color: #6b7285; text-align: center; margin: 0; }
+</style>
+</head>
+<body>
+  <h1>Phone controller</h1>
+  <p id="status">Tap Start to enable the motion sensor.</p>
+  <div class="row">
+    <button id="start">Start</button>
+    <button id="zero" disabled>Zero</button>
+  </div>
+  <div class="pad" id="pad"><div id="dot"></div></div>
+  <div class="readout">Roll <b id="roll">0.0</b>° · Pitch <b id="pitch">0.0</b>°</div>
+  <p class="hint">Hold the phone flat like a tray, top edge pointing forward. Tilt forward to accelerate, back to reverse, sideways to steer. Tap Zero to set the current pose as neutral.</p>
+
+<script>
+const MAX_TILT = 30;           // matches FULL_TILT_DEG in core.py (dot reaches the edge)
+const SEND_MS = 40;            // 25 Hz, same as the ESP32 firmware
+
+const $ = (id) => document.getElementById(id);
+const clamp = (v, lim) => Math.max(-lim, Math.min(lim, v));
+
+function carId() {
+  const fromUrl = new URLSearchParams(location.search).get("id");
+  if (fromUrl && /^[A-Za-z0-9_-]{1,24}$/.test(fromUrl)) return fromUrl;
+  try {
+    let id = localStorage.getItem("carId");
+    if (!id) {
+      id = "phone-" + Math.random().toString(16).slice(2, 6);
+      localStorage.setItem("carId", id);
+    }
+    return id;
+  } catch (e) {
+    return "phone-" + Math.random().toString(16).slice(2, 6);
+  }
+}
+
+const id = carId();
+let rawRoll = 0, rawPitch = 0, offRoll = 0, offPitch = 0;
+let gotSample = false, zeroOnNext = false, inflight = false, timer = null, failures = 0;
+
+function onOrientation(e) {
+  if (e.beta == null || e.gamma == null) return;
+  rawRoll = e.gamma;     // + = right side down
+  rawPitch = -e.beta;    // + = top edge down (forward)
+  gotSample = true;
+  if (zeroOnNext) { zero(); zeroOnNext = false; }
+}
+
+function zero() { offRoll = rawRoll; offPitch = rawPitch; }
+
+async function send() {
+  if (!gotSample) return;
+  const roll = clamp(rawRoll - offRoll, 90);
+  const pitch = clamp(rawPitch - offPitch, 90);
+  $("roll").textContent = roll.toFixed(1);
+  $("pitch").textContent = pitch.toFixed(1);
+  const reach = ($("pad").clientWidth / 2) * 0.88;   // px from center to the pad edge
+  $("dot").style.transform =
+    `translate(${clamp(roll / MAX_TILT, 1) * reach}px, ${clamp(-pitch / MAX_TILT, 1) * reach}px)`;
+
+  if (inflight) return;
+  inflight = true;
+  try {
+    const res = await fetch("/tilt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, roll: +roll.toFixed(1), pitch: +pitch.toFixed(1) }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    failures = 0;
+    $("status").textContent = `Connected as ${id}`;
+  } catch (err) {
+    if (++failures > 5) $("status").textContent = "Lost connection to the PC. Retrying...";
+  } finally {
+    inflight = false;
+  }
+}
+
+$("start").addEventListener("click", async () => {
+  const DOE = window.DeviceOrientationEvent;
+  if (!DOE) {
+    $("status").textContent = "This browser has no motion sensor support.";
+    return;
+  }
+  if (typeof DOE.requestPermission === "function") {   // iOS 13+
+    try {
+      if ((await DOE.requestPermission()) !== "granted") {
+        $("status").textContent = "Motion permission denied. Reload the page and allow it.";
+        return;
+      }
+    } catch (e) {
+      $("status").textContent = "Could not ask for motion permission: " + e.message;
+      return;
+    }
+  }
+  window.addEventListener("deviceorientation", onOrientation);
+  zeroOnNext = true;
+  $("start").disabled = true;
+  $("zero").disabled = false;
+  $("status").textContent = "Waiting for sensor data...";
+  timer = setInterval(send, SEND_MS);
+  try { await navigator.wakeLock.request("screen"); } catch (e) { /* optional */ }
+  setTimeout(() => {
+    if (!gotSample) $("status").textContent = "No sensor data. Is this page opened over HTTPS?";
+  }, 2000);
+});
+
+$("zero").addEventListener("click", zero);
+</script>
+</body>
+</html>

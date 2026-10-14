@@ -1,0 +1,30 @@
+[project]
+name = "carritos-mc"
+version = "1.0.0"
+description = "Lane-free multi-car arena driven by ESP32 tilt controllers over MQTT"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "pygame>=2.5",
+    "paho-mqtt>=2.0",
+    "cryptography>=42",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+carritos = "carritos.app:main"
+carritos-phone-bridge = "carritos.phone_bridge:main"
+carritos-sim = "carritos.simulator:main"
+
+[tool.setuptools]
+packages = ["carritos"]
+
+[tool.setuptools.package-data]
+carritos = ["web/*.html"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
